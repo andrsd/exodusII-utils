@@ -13,3 +13,9 @@ target_link_libraries(${PROJECT_NAME}
         exodusIIcpp::exodusIIcpp
         fmt::fmt
 )
+
+install(
+    TARGETS ${PROJECT_NAME}
+    EXPORT exodusII-utils-targets
+    RUNTIME DESTINATION bin
+)
