@@ -12,3 +12,4 @@ find_package(exodusIIcpp 3 REQUIRED)
 find_package(fmt 11 REQUIRED)
 
 add_subdirectory(exo-join)
+add_subdirectory(exo-info)
