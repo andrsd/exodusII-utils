@@ -47,8 +47,6 @@ using NodeMap = std::map<int, int>;
 /// Variable values. Time steps, variables, values
 using NodalVariableValues = std::vector<std::vector<std::vector<double>>>;
 
-/// Block ID -> element type
-std::map<int, ElementType> block_element_type;
 /// Block ID -> num elements per node
 std::map<int, int> num_nodes_per_elem;
 
@@ -109,6 +107,21 @@ scatter(const std::vector<double> & src, const std::vector<int> & idx, std::vect
     }
 }
 
+std::map<int, ElementType>
+read_element_types(exodusIIcpp::File & exo)
+{
+    std::map<int, ElementType> block_element_type;
+
+    for (auto & eb : exo.get_element_blocks()) {
+        auto id = eb.get_id();
+        auto elem_type_s = eb.get_element_type();
+        auto et = element_type(elem_type_s);
+        block_element_type.emplace(id, et);
+    }
+
+    return block_element_type;
+}
+
 void
 read_block_ids(exodusIIcpp::File & exo, std::set<int64_t> & block_ids)
 {
@@ -158,17 +171,6 @@ read_elements(exodusIIcpp::File & exo)
     for (auto & eb : exo.get_element_blocks()) {
         auto id = eb.get_id();
         auto elem_type_s = eb.get_element_type();
-        auto et = element_type(elem_type_s);
-
-        // check that element type matches
-        auto it = block_element_type.find(id);
-        if (it == block_element_type.end())
-            block_element_type.emplace(id, et);
-        else if (it->second != et)
-            throw std::runtime_error(
-                fmt::format("Element type '{}' of block {} does not match across files.",
-                            elem_type_s,
-                            id));
 
         auto nn = eb.get_num_nodes_per_element();
         num_nodes_per_elem[id] = nn;
@@ -231,11 +233,12 @@ write_nodes(exodusIIcpp::File & exo, int dim, const std::map<Point, int> & node_
 void
 write_elements(exodusIIcpp::File & exo,
                const std::set<int64_t> & block_ids,
+               const std::map<int, ElementType> & block_element_type,
                const std::map<int, std::vector<int>> & block_connect)
 {
     for (auto blk_id : block_ids) {
         int64_t n_elems_in_block = block_connect.at(blk_id).size() / num_nodes_per_elem[blk_id];
-        auto elem_type = element_type_str(block_element_type[blk_id]);
+        auto elem_type = element_type_str(block_element_type.at(blk_id));
         exo.write_block(blk_id, elem_type, n_elems_in_block, block_connect.at(blk_id));
     }
 }
@@ -277,6 +280,8 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     std::map<int, std::vector<int>> index_set;
     // Block IDs
     std::set<int64_t> block_ids;
+    /// Block ID -> element type
+    std::map<int, ElementType> block_element_type;
     // Elements per block: Block ID -> connectivity array (1-based)
     std::map<int, std::vector<int>> block_connect;
     // Nodal var names
@@ -295,6 +300,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
 
         ex_in.read_blocks();
         read_block_ids(ex_in, block_ids);
+        block_element_type = read_element_types(ex_in);
         index_set[i] = read_file(ex_in, dim, node_map);
         auto blocks = read_elements(ex_in);
         for (auto & [id, connect] : blocks) {
@@ -327,7 +333,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     ex_out.init("", dim, n_nodes, n_elems, n_elem_blks, n_node_sets, n_side_sets);
 
     write_nodes(ex_out, dim, node_map);
-    write_elements(ex_out, block_ids, block_connect);
+    write_elements(ex_out, block_ids, block_element_type, block_connect);
     write_nodal_variables(ex_out, index_set, times, n_nodes, nodal_var_names, nodal_vals);
 }
 
