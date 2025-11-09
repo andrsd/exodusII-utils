@@ -49,12 +49,47 @@ print_cell_set_info(const exodusIIcpp::File & exo)
 }
 
 void
+print_side_set_info(const exodusIIcpp::File & exo)
+{
+    // side sets
+    if (exo.get_num_side_sets() > 0) {
+        std::size_t wd_id = 1;
+        std::size_t wd_name = 1;
+        std::size_t wd_num = 1;
+        for (const auto & ss : exo.get_side_sets()) {
+            wd_id = std::max(wd_id, fmt::format("{}", ss.get_id()).size());
+            auto name = ss.get_name();
+            if (name.size() == 0)
+                name = "<no name>";
+            wd_name = std::max(wd_name, fmt::format("{}", name).size());
+            wd_num = std::max(wd_num, fmt::format("{}", human_number(ss.get_size())).size());
+        }
+        wd_name++;
+
+        fmt::print("\n");
+        fmt::print("Side sets [{}]:\n", exo.get_num_side_sets());
+
+        for (const auto & ss : exo.get_side_sets()) {
+            auto id = ss.get_id();
+            fmt::print("- {:>{}}: ", id, wd_id);
+            auto name = ss.get_name();
+            if (name.size() == 0)
+                name = "<no name>";
+            fmt::print("{:<{}} ", name, wd_name);
+
+            fmt::print("{:>{}} sides\n", human_number(ss.get_size()), wd_num);
+        }
+    }
+}
+
+void
 print_mesh_info(const std::string & filename)
 {
     fmt::print("Reading file: {}...", filename);
     std::fflush(stdout);
     exodusIIcpp::File exo(filename, exodusIIcpp::FileAccess::READ);
     exo.read_blocks();
+    exo.read_side_sets();
     fmt::print(" done\n");
 
     fmt::print("\n");
@@ -63,7 +98,7 @@ print_mesh_info(const std::string & filename)
     fmt::print("- {} nodes\n", human_number(exo.get_num_nodes()));
 
     print_cell_set_info(exo);
-    // print_side_set_info(mesh);
+    print_side_set_info(exo);
 }
 
 int
