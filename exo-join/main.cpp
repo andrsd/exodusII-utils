@@ -53,6 +53,8 @@ std::map<int, ElementType> block_element_type;
 std::map<int, int> num_nodes_per_elem;
 /// Elements per block: Block ID -> connectivity array
 std::map<int, std::vector<int>> block_connect;
+/// Block ID -> global node IDs
+std::map<int, std::vector<int>> index_set;
 
 /// Convert string representation of an element type into enum
 ElementType
@@ -92,15 +94,12 @@ snap_point(const Point & p, double tol)
     return { snap(p.x), snap(p.y), snap(p.z) };
 }
 
+/// @param connect Block connectivity (from exodusii) - 1-based indexing
 void
-remap_connectivity(std::vector<int> & connect, const NodeMap & node_map)
+remap_connectivity(std::vector<int> & connect, const std::vector<int> & is)
 {
-    for (auto & idx : connect) {
-        auto it = node_map.find(idx);
-        if (it == node_map.end())
-            throw std::runtime_error(fmt::format("Failed to find node {} in node map", idx));
-        idx = it->second;
-    }
+    for (auto & idx : connect)
+        idx = is[idx - 1];
 }
 
 void
@@ -116,27 +115,26 @@ read_file(const std::string & file_name)
             fmt::format("Incompatible dimension {} in file {}", exo.get_dim(), file_name));
 
     // build nodes
-    NodeMap node_map;
+    auto n_nodes = exo.get_num_nodes();
+    std::vector<int> is(n_nodes);
     exo.read_coords();
     if (dim == 2) {
-        auto n_nodes = exo.get_num_nodes();
         auto x = exo.get_x_coords();
         auto y = exo.get_y_coords();
         for (int i = 0; i < n_nodes; ++i) {
             auto pt = snap_point({ x[i], y[i], 0. }, SNAP_TOLERANCE);
             auto [it, inserted] = g_node_map.emplace(pt, g_node_map.size() + 1);
-            node_map.emplace(i + 1, it->second);
+            is[i] = it->second;
         }
     }
     else if (dim == 3) {
-        auto n_nodes = exo.get_num_nodes();
         auto x = exo.get_x_coords();
         auto y = exo.get_y_coords();
         auto z = exo.get_z_coords();
         for (int i = 0; i < n_nodes; ++i) {
             auto pt = snap_point({ x[i], y[i], z[i] }, SNAP_TOLERANCE);
             auto [it, inserted] = g_node_map.emplace(pt, g_node_map.size() + 1);
-            node_map.emplace(i + 1, it->second);
+            is[i] = it->second;
         }
     }
     else
@@ -165,7 +163,7 @@ read_file(const std::string & file_name)
         num_nodes_per_elem[id] = nn;
 
         auto connect = eb.get_connectivity();
-        remap_connectivity(connect, node_map);
+        remap_connectivity(connect, is);
         block_connect[id].insert(block_connect[id].end(), connect.begin(), connect.end());
     }
 
