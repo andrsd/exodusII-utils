@@ -51,8 +51,6 @@ using NodalVariableValues = std::vector<std::vector<std::vector<double>>>;
 std::map<int, ElementType> block_element_type;
 /// Block ID -> num elements per node
 std::map<int, int> num_nodes_per_elem;
-/// Elements per block: Block ID -> connectivity array (1-based)
-std::map<int, std::vector<int>> block_connect;
 /// file index -> global node IDs (0-based)
 std::map<int, std::vector<int>> index_set;
 
@@ -233,12 +231,14 @@ write_nodes(exodusIIcpp::File & exo, int dim, const std::map<Point, int> & node_
 }
 
 void
-write_elements(exodusIIcpp::File & exo, const std::set<int64_t> & block_ids)
+write_elements(exodusIIcpp::File & exo,
+               const std::set<int64_t> & block_ids,
+               const std::map<int, std::vector<int>> & block_connect)
 {
     for (auto blk_id : block_ids) {
-        int64_t n_elems_in_block = block_connect[blk_id].size() / num_nodes_per_elem[blk_id];
+        int64_t n_elems_in_block = block_connect.at(blk_id).size() / num_nodes_per_elem[blk_id];
         auto elem_type = element_type_str(block_element_type[blk_id]);
-        exo.write_block(blk_id, elem_type, n_elems_in_block, block_connect[blk_id]);
+        exo.write_block(blk_id, elem_type, n_elems_in_block, block_connect.at(blk_id));
     }
 }
 
@@ -276,6 +276,8 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     std::map<Point, int> node_map;
     // Block IDs
     std::set<int64_t> block_ids;
+    // Elements per block: Block ID -> connectivity array (1-based)
+    std::map<int, std::vector<int>> block_connect;
     // Nodal var names
     std::vector<std::string> nodal_var_names;
     // Nodal variable values per input file
@@ -324,7 +326,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     ex_out.init("", dim, n_nodes, n_elems, n_elem_blks, n_node_sets, n_side_sets);
 
     write_nodes(ex_out, dim, node_map);
-    write_elements(ex_out, block_ids);
+    write_elements(ex_out, block_ids, block_connect);
     write_nodal_variables(ex_out, times, n_nodes, nodal_var_names, nodal_vals);
 }
 
