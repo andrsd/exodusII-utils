@@ -47,8 +47,6 @@ using NodeMap = std::map<int, int>;
 /// Variable values. Time steps, variables, values
 using NodalVariableValues = std::vector<std::vector<std::vector<double>>>;
 
-/// Global spatial dimension
-int dim = -1;
 /// Block IDs
 std::set<int64_t> block_ids;
 /// Block ID -> element type
@@ -118,7 +116,7 @@ scatter(const std::vector<double> & src, const std::vector<int> & idx, std::vect
 }
 
 std::vector<int>
-read_file(exodusIIcpp::File & exo, std::map<Point, int> & node_map)
+read_file(exodusIIcpp::File & exo, int dim, std::map<Point, int> & node_map)
 {
     // build nodes
     auto n_nodes = exo.get_num_nodes();
@@ -203,7 +201,7 @@ read_nodal_vals(exodusIIcpp::File & exo)
 }
 
 void
-write_nodes(exodusIIcpp::File & exo, const std::map<Point, int> & node_map)
+write_nodes(exodusIIcpp::File & exo, int dim, const std::map<Point, int> & node_map)
 {
     auto n_nodes = node_map.size();
     if (dim == 2) {
@@ -268,6 +266,8 @@ write_nodal_variables(exodusIIcpp::File & exo,
 void
 join_files(const std::vector<std::string> & inputs, const std::string & output)
 {
+    // Spatial dimension
+    int dim = -1;
     // Mapping node coordinates into global index: Point -> Global ID (0-based)
     std::map<Point, int> node_map;
     // Nodal var names
@@ -282,13 +282,9 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
         exodusIIcpp::File ex_in(inputs[i], exodusIIcpp::FileAccess::READ);
         ex_in.init();
 
-        // dimension
-        if (dim == -1)
-            dim = ex_in.get_dim();
-        else if (ex_in.get_dim() != dim)
-            throw std::runtime_error(fmt::format("Incompatible dimension {}", ex_in.get_dim()));
+        dim = ex_in.get_dim();
 
-        index_set[i] = read_file(ex_in, node_map);
+        index_set[i] = read_file(ex_in, dim, node_map);
         auto blocks = read_elements(ex_in);
         for (auto & [id, connect] : blocks) {
             remap_connectivity(connect, index_set[i]);
@@ -319,7 +315,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     int n_side_sets = 0;
     ex_out.init("", dim, n_nodes, n_elems, n_elem_blks, n_node_sets, n_side_sets);
 
-    write_nodes(ex_out, node_map);
+    write_nodes(ex_out, dim, node_map);
     write_elements(ex_out);
     write_nodal_variables(ex_out, times, n_nodes, nodal_var_names, nodal_vals);
 }
