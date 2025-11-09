@@ -323,10 +323,8 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
 
     auto n_nodes = node_map.size();
     int64_t n_elems = 0;
-    for (auto blk_id : block_ids) {
-        int64_t n_elems_in_block = block_connect[blk_id].size() / num_nodes_per_elem[blk_id];
-        n_elems += n_elems_in_block;
-    }
+    for (auto blk_id : block_ids)
+        n_elems += block_connect[blk_id].size() / num_nodes_per_elem[blk_id];
     int n_elem_blks = block_connect.size();
     int n_node_sets = 0;
     int n_side_sets = 0;
