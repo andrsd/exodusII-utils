@@ -51,8 +51,6 @@ using NodalVariableValues = std::vector<std::vector<std::vector<double>>>;
 std::map<int, ElementType> block_element_type;
 /// Block ID -> num elements per node
 std::map<int, int> num_nodes_per_elem;
-/// file index -> global node IDs (0-based)
-std::map<int, std::vector<int>> index_set;
 
 /// Convert string representation of an element type into enum
 ElementType
@@ -244,6 +242,7 @@ write_elements(exodusIIcpp::File & exo,
 
 void
 write_nodal_variables(exodusIIcpp::File & exo,
+                      const std::map<int, std::vector<int>> & index_set,
                       const std::vector<double> & times,
                       std::size_t n_nodes,
                       const std::vector<std::string> & var_names,
@@ -258,7 +257,7 @@ write_nodal_variables(exodusIIcpp::File & exo,
         for (int var_idx = 0; var_idx < var_names.size(); ++var_idx) {
             for (auto fi = 0; fi < var_values.size(); ++fi) {
                 const auto & vals = var_values[fi][t][var_idx];
-                scatter(vals, index_set[fi], values);
+                scatter(vals, index_set.at(fi), values);
             }
             exo.write_nodal_var(t + 1, var_idx + 1, values);
         }
@@ -274,6 +273,8 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     int dim = -1;
     // Mapping node coordinates into global index: Point -> Global ID (0-based)
     std::map<Point, int> node_map;
+    /// file index -> global node IDs (0-based)
+    std::map<int, std::vector<int>> index_set;
     // Block IDs
     std::set<int64_t> block_ids;
     // Elements per block: Block ID -> connectivity array (1-based)
@@ -327,7 +328,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
 
     write_nodes(ex_out, dim, node_map);
     write_elements(ex_out, block_ids, block_connect);
-    write_nodal_variables(ex_out, times, n_nodes, nodal_var_names, nodal_vals);
+    write_nodal_variables(ex_out, index_set, times, n_nodes, nodal_var_names, nodal_vals);
 }
 
 int
