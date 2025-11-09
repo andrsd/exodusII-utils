@@ -47,8 +47,6 @@ using NodeMap = std::map<int, int>;
 /// Variable values. Time steps, variables, values
 using NodalVariableValues = std::vector<std::vector<std::vector<double>>>;
 
-/// Block IDs
-std::set<int64_t> block_ids;
 /// Block ID -> element type
 std::map<int, ElementType> block_element_type;
 /// Block ID -> num elements per node
@@ -115,6 +113,15 @@ scatter(const std::vector<double> & src, const std::vector<int> & idx, std::vect
     }
 }
 
+void
+read_block_ids(exodusIIcpp::File & exo, std::set<int64_t> & block_ids)
+{
+    for (auto & eb : exo.get_element_blocks()) {
+        auto id = eb.get_id();
+        block_ids.insert(id);
+    }
+}
+
 std::vector<int>
 read_file(exodusIIcpp::File & exo, int dim, std::map<Point, int> & node_map)
 {
@@ -152,7 +159,6 @@ read_elements(exodusIIcpp::File & exo)
 {
     std::map<int, std::vector<int>> blocks;
 
-    exo.read_blocks();
     for (auto & eb : exo.get_element_blocks()) {
         auto id = eb.get_id();
         auto elem_type_s = eb.get_element_type();
@@ -167,8 +173,6 @@ read_elements(exodusIIcpp::File & exo)
                 fmt::format("Element type '{}' of block {} does not match across files.",
                             elem_type_s,
                             id));
-
-        block_ids.insert(id);
 
         auto nn = eb.get_num_nodes_per_element();
         num_nodes_per_elem[id] = nn;
@@ -229,7 +233,7 @@ write_nodes(exodusIIcpp::File & exo, int dim, const std::map<Point, int> & node_
 }
 
 void
-write_elements(exodusIIcpp::File & exo)
+write_elements(exodusIIcpp::File & exo, const std::set<int64_t> & block_ids)
 {
     for (auto blk_id : block_ids) {
         int64_t n_elems_in_block = block_connect[blk_id].size() / num_nodes_per_elem[blk_id];
@@ -270,6 +274,8 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     int dim = -1;
     // Mapping node coordinates into global index: Point -> Global ID (0-based)
     std::map<Point, int> node_map;
+    // Block IDs
+    std::set<int64_t> block_ids;
     // Nodal var names
     std::vector<std::string> nodal_var_names;
     // Nodal variable values per input file
@@ -284,6 +290,8 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
 
         dim = ex_in.get_dim();
 
+        ex_in.read_blocks();
+        read_block_ids(ex_in, block_ids);
         index_set[i] = read_file(ex_in, dim, node_map);
         auto blocks = read_elements(ex_in);
         for (auto & [id, connect] : blocks) {
@@ -316,7 +324,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     ex_out.init("", dim, n_nodes, n_elems, n_elem_blks, n_node_sets, n_side_sets);
 
     write_nodes(ex_out, dim, node_map);
-    write_elements(ex_out);
+    write_elements(ex_out, block_ids);
     write_nodal_variables(ex_out, times, n_nodes, nodal_var_names, nodal_vals);
 }
 
