@@ -29,6 +29,8 @@ element_type(std::string_view str)
         return ElementType::TRI3;
     else if (str == "QUAD" || str == "QUAD4")
         return ElementType::QUAD4;
+    else if (str == "TETRA" || str == "TET4")
+        return ElementType::TET4;
     else
         throw std::runtime_error(fmt::format("Unsupported element type {}", str));
 }
