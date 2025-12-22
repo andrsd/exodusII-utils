@@ -104,20 +104,27 @@ print_mesh_info(const std::string & filename)
 int
 main(int argc, char * argv[])
 {
-    cxxopts::Options options("exo-info", "Display information about an exodusII file");
-    // clang-format off
-    options.add_options()
-        ("filename", "The mesh file name", cxxopts::value<std::string>())
-        ("h,help", "Print usage")
-    ;
-    // clang-format on
-    options.parse_positional({ "filename" });
+    try {
+        cxxopts::Options options("exo-info", "Display information about an exodusII file");
+        // clang-format off
+        options.add_options()
+            ("filename", "The mesh file name", cxxopts::value<std::string>())
+            ("h,help", "Print usage")
+        ;
+        // clang-format on
+        options.parse_positional({ "filename" });
 
-    auto result = options.parse(argc, argv);
-    if (result["filename"].count())
-        print_mesh_info(result["filename"].as<std::string>());
-    else {
-        fmt::print("{}\n", options.help());
+        auto result = options.parse(argc, argv);
+        if (result["filename"].count())
+            print_mesh_info(result["filename"].as<std::string>());
+        else {
+            fmt::print("{}\n", options.help());
+        }
+        return 0;
     }
-    return 0;
+    catch (std::exception & e) {
+        fmt::println("");
+        fmt::println("ERROR: {}", e.what());
+        return 1;
+    }
 }
