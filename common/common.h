@@ -31,6 +31,8 @@ element_type(std::string_view str)
         return ElementType::QUAD4;
     else if (str == "TETRA" || str == "TET4")
         return ElementType::TET4;
+    else if (str == "HEX" || str == "HEX8")
+        return ElementType::HEX8;
     else
         throw std::runtime_error(fmt::format("Unsupported element type {}", str));
 }
