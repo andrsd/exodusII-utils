@@ -40,7 +40,9 @@ element_type(std::string_view str)
 inline const char *
 element_type_str(ElementType et)
 {
-    if (et == ElementType::SEGMENT2)
+    if (et == ElementType::POINT1)
+        return "POINT";
+    else if (et == ElementType::SEGMENT2)
         return "BAR2";
     else if (et == ElementType::TRI3)
         return "TRI3";
@@ -48,6 +50,12 @@ element_type_str(ElementType et)
         return "QUAD4";
     else if (et == ElementType::TET4)
         return "TET4";
+    else if (et == ElementType::HEX8)
+        return "HEX8";
+    else if (et == ElementType::PYRAMID5)
+        return "PYRAMID5";
+    else if (et == ElementType::PRISM6)
+        return "PRISM6";
     else
         throw std::runtime_error(fmt::format("Unsupported element type"));
 }
