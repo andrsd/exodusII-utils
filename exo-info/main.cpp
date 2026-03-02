@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025 David Andrs <andrsd@gmail.com>
 // SPDX-License-Identifier: MIT
 
+#include <cstdlib>
 #include "common.h"
 #include "cxxopts/cxxopts.hpp"
 #include <exodusIIcpp/exodusIIcpp.h>

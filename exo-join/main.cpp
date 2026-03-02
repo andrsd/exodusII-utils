@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025 (c) David Andrs <andrsd@gmail.com>
 // SPDX-License-Identifier: MIT
 
+#include <cstdlib>
 #include "cxxopts/cxxopts.hpp"
 #include <exodusIIcpp/enums.h>
 #include <exodusIIcpp/exodusIIcpp.h>
