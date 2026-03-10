@@ -1,6 +1,8 @@
 project(exo-info)
 
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME})
+
+target_sources(${PROJECT_NAME} PRIVATE main.cpp)
 
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 
@@ -19,5 +21,4 @@ target_link_libraries(${PROJECT_NAME}
 install(
     TARGETS ${PROJECT_NAME}
     EXPORT exodusII-utils-targets
-    RUNTIME DESTINATION bin
 )
