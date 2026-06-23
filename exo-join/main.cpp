@@ -68,19 +68,15 @@ scatter(const std::vector<double> & src, const std::vector<int> & idx, std::vect
     }
 }
 
-std::map<int, ElementType>
-read_element_types(exodusIIcpp::File & exo)
+void
+read_element_types(exodusIIcpp::File & exo, std::map<int, ElementType> & block_element_type)
 {
-    std::map<int, ElementType> block_element_type;
-
     for (auto & eb : exo.get_element_blocks()) {
         auto id = eb.get_id();
         auto elem_type_s = eb.get_element_type();
         auto et = element_type(elem_type_s);
-        block_element_type.emplace(id, et);
+        block_element_type.try_emplace(id, et);
     }
-
-    return block_element_type;
 }
 
 void
@@ -276,7 +272,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
 
         ex_in.read_blocks();
         read_block_ids(ex_in, block_ids);
-        block_element_type = read_element_types(ex_in);
+        read_element_types(ex_in, block_element_type);
         index_set[i] = read_file(ex_in, dim, node_map);
         auto blocks = read_elements(ex_in);
         for (auto & [id, connect] : blocks) {
