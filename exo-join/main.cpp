@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include <cstdlib>
+#include "common.h"
 #include "cxxopts/cxxopts.hpp"
 #include <exodusIIcpp/enums.h>
 #include <exodusIIcpp/exodusIIcpp.h>
@@ -16,18 +17,6 @@
 
 /// Snap tolerance on points
 constexpr double SNAP_TOLERANCE = 1e-10;
-
-enum class ElementType {
-    //
-    POINT1,
-    SEGMENT2,
-    TRI3,
-    QUAD4,
-    TET4,
-    HEX8,
-    PRISM6,
-    PYRAMID5
-};
 
 struct Point {
     double x, y, z;
@@ -50,35 +39,6 @@ using NodalVariableValues = std::vector<std::vector<std::vector<double>>>;
 
 /// Block ID -> num elements per node
 std::map<int, int> num_nodes_per_elem;
-
-/// Convert string representation of an element type into enum
-ElementType
-element_type(std::string_view str)
-{
-    if (str == "BAR2")
-        return ElementType::SEGMENT2;
-    else if (str == "TRI" || str == "TRI3")
-        return ElementType::TRI3;
-    else if (str == "QUAD" || str == "QUAD4")
-        return ElementType::QUAD4;
-    else
-        throw std::runtime_error(fmt::format("Unsupported element type {}", str));
-}
-
-const char *
-element_type_str(ElementType et)
-{
-    if (et == ElementType::SEGMENT2)
-        return "BAR2";
-    else if (et == ElementType::TRI3)
-        return "TRI3";
-    else if (et == ElementType::QUAD4)
-        return "QUAD4";
-    else if (et == ElementType::TET4)
-        return "TET4";
-    else
-        throw std::runtime_error(fmt::format("Unsupported element type"));
-}
 
 /// Snap a point to a grid
 inline Point
