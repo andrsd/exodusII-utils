@@ -205,6 +205,19 @@ write_elements(exodusIIcpp::File & exo,
 }
 
 void
+write_block_names(exodusIIcpp::File & exo,
+                  const std::set<int64_t> & block_ids,
+                  const std::map<int64_t, std::string> & block_names)
+{
+    std::vector<std::string> names;
+    for (auto id : block_ids)
+        names.push_back(block_names.at(id));
+
+    if (not names.empty())
+        exo.write_block_names(names);
+}
+
+void
 write_nodal_variables(exodusIIcpp::File & exo,
                       const std::map<int, std::vector<int>> & index_set,
                       const std::vector<double> & times,
@@ -245,6 +258,8 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     std::map<int, ElementType> block_element_type;
     // Elements per block: Block ID -> connectivity array (1-based)
     std::map<int, std::vector<int>> block_connect;
+    // Element block names
+    std::map<int64_t, std::string> block_names;
     // Nodal var names
     std::vector<std::string> nodal_var_names;
     // Nodal variable values per input file
@@ -268,6 +283,10 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
             remap_connectivity(connect, index_set[i]);
             block_connect[id].insert(block_connect[id].end(), connect.begin(), connect.end());
         }
+
+        // block names
+        for (auto [id, name] : ex_in.read_block_names())
+            block_names[id] = name;
 
         // TODO: even check var names...
         nodal_var_names = ex_in.get_nodal_variable_names();
@@ -293,6 +312,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
 
     write_nodes(ex_out, dim, node_map);
     write_elements(ex_out, block_ids, block_element_type, block_connect);
+    write_block_names(ex_out, block_ids, block_names);
     write_nodal_variables(ex_out, index_set, times, n_nodes, nodal_var_names, nodal_vals);
 }
 
