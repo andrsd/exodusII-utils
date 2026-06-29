@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.18)
 
 project(exodusII-utils
     LANGUAGES CXX
-    VERSION 0.2.2
+    VERSION 0.2.3
 )
 
 include(CMakePackageConfigHelpers)
