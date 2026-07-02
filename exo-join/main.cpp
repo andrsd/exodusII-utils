@@ -159,6 +159,19 @@ read_nodal_vals(exodusIIcpp::File & exo)
     return nodal_var_values;
 }
 
+std::vector<std::vector<double>>
+read_global_vals(const exodusIIcpp::File & exo)
+{
+    std::vector<std::vector<double>> vals;
+    auto n_times = exo.get_num_times();
+    vals.reserve(n_times);
+    for (int t = 0; t < n_times; t++) {
+        auto step_vals = exo.get_global_variable_values(t + 1);
+        vals.emplace_back(std::move(step_vals));
+    }
+    return vals;
+}
+
 void
 write_nodes(exodusIIcpp::File & exo, int dim, const std::map<Point, int> & node_map)
 {
@@ -214,32 +227,6 @@ write_block_names(exodusIIcpp::File & exo,
 }
 
 void
-write_nodal_variables(exodusIIcpp::File & exo,
-                      const std::map<int, std::vector<int>> & index_set,
-                      const std::vector<double> & times,
-                      std::size_t n_nodes,
-                      const std::vector<std::string> & var_names,
-                      const std::vector<NodalVariableValues> & var_values)
-{
-    exo.write_nodal_var_names(var_names);
-
-    std::vector<double> values(n_nodes);
-    for (auto t = 0; t < times.size(); ++t) {
-        exo.write_time(t + 1, times[t]);
-
-        for (int var_idx = 0; var_idx < var_names.size(); ++var_idx) {
-            for (auto fi = 0; fi < var_values.size(); ++fi) {
-                const auto & vals = var_values[fi][t][var_idx];
-                scatter(vals, index_set.at(fi), values);
-            }
-            exo.write_nodal_var(t + 1, var_idx + 1, values);
-        }
-
-        exo.update();
-    }
-}
-
-void
 join_files(const std::vector<std::string> & inputs, const std::string & output)
 {
     // Spatial dimension
@@ -262,6 +249,10 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     std::vector<NodalVariableValues> nodal_vals(inputs.size());
     // Time steps
     std::vector<double> times;
+    // Global variable names
+    std::vector<std::string> global_var_names;
+    // Global variable values
+    std::vector<std::vector<double>> global_vals;
 
     // read data
     for (int i = 0; i < inputs.size(); ++i) {
@@ -292,6 +283,13 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
         times = ex_in.get_times();
 
         nodal_vals[i] = read_nodal_vals(ex_in);
+
+        // TODO: check var names, possibly even merge
+        if (i == 0) {
+            // only grab values from the first part file, for right now
+            global_var_names = ex_in.get_global_variable_names();
+            global_vals = read_global_vals(ex_in);
+        }
     }
 
     // write
@@ -309,7 +307,29 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     write_nodes(ex_out, dim, node_map);
     write_elements(ex_out, block_ids, block_element_type, block_connect);
     write_block_names(ex_out, block_ids, block_names);
-    write_nodal_variables(ex_out, index_set, times, n_nodes, nodal_var_names, nodal_vals);
+
+    ex_out.write_nodal_var_names(nodal_var_names);
+    ex_out.write_global_var_names(global_var_names);
+    for (auto t = 0; t < times.size(); ++t) {
+        ex_out.write_time(t + 1, times[t]);
+
+        {
+            std::vector<double> values(n_nodes);
+            for (int var_idx = 0; var_idx < nodal_var_names.size(); ++var_idx) {
+                for (auto fi = 0; fi < nodal_vals.size(); ++fi) {
+                    const auto & vals = nodal_vals[fi][t][var_idx];
+                    scatter(vals, index_set.at(fi), values);
+                }
+                ex_out.write_nodal_var(t + 1, var_idx + 1, values);
+            }
+        }
+        {
+            for (int var_idx = 0; var_idx < nodal_var_names.size(); ++var_idx)
+                ex_out.write_global_var(t + 1, var_idx, global_vals[t][var_idx]);
+        }
+
+        ex_out.update();
+    }
 }
 
 int
