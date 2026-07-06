@@ -288,7 +288,8 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
         if (i == 0) {
             // only grab values from the first part file, for right now
             global_var_names = ex_in.get_global_variable_names();
-            global_vals = read_global_vals(ex_in);
+            if (not global_var_names.empty())
+                global_vals = read_global_vals(ex_in);
         }
     }
 
@@ -309,7 +310,8 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     write_block_names(ex_out, block_ids, block_names);
 
     ex_out.write_nodal_var_names(nodal_var_names);
-    ex_out.write_global_var_names(global_var_names);
+    if (not global_var_names.empty())
+        ex_out.write_global_var_names(global_var_names);
     for (auto t = 0; t < times.size(); ++t) {
         ex_out.write_time(t + 1, times[t]);
 
@@ -324,7 +326,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
             }
         }
         {
-            for (int var_idx = 0; var_idx < nodal_var_names.size(); ++var_idx)
+            for (int var_idx = 0; var_idx < global_var_names.size(); ++var_idx)
                 ex_out.write_global_var(t + 1, var_idx, global_vals[t][var_idx]);
         }
 
