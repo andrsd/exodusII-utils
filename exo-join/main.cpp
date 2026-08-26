@@ -327,7 +327,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
         }
         {
             for (int var_idx = 0; var_idx < global_var_names.size(); ++var_idx)
-                ex_out.write_global_var(t + 1, var_idx, global_vals[t][var_idx]);
+                ex_out.write_global_var(t + 1, var_idx + 1, global_vals[t][var_idx]);
         }
 
         ex_out.update();
