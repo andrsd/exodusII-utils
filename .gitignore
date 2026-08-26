@@ -3,4 +3,5 @@ build-*/
 .idea/
 .DS_Store
 .zed/
-.vscode
+.vscode/
+.cache/
