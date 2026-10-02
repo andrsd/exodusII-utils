@@ -33,7 +33,7 @@ element_type(std::string_view str)
         return ElementType::TET4;
     else if (str == "HEX" || str == "HEX8")
         return ElementType::HEX8;
-    else if (str == "WEDGE")
+    else if (str == "WEDGE" || str == "WEDGE6")
         return ElementType::PRISM6;
     else
         throw std::runtime_error(fmt::format("Unsupported element type {}", str));
@@ -57,7 +57,7 @@ element_type_str(ElementType et)
     else if (et == ElementType::PYRAMID5)
         return "PYRAMID5";
     else if (et == ElementType::PRISM6)
-        return "PRISM6";
+        return "WEDGE6";
     else
         throw std::runtime_error(fmt::format("Unsupported element type"));
 }
