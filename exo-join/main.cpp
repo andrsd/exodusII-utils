@@ -15,9 +15,6 @@
 #include <numeric>
 #include <cassert>
 
-/// Snap tolerance on points
-constexpr double SNAP_TOLERANCE = 1e-10;
-
 struct Point {
     double x, y, z;
 };
@@ -86,18 +83,20 @@ read_block_ids(exodusIIcpp::File & exo, std::set<int64_t> & block_ids)
     }
 }
 
-void
-read_coordinates(exodusIIcpp::File & exo, int dim, std::vector<Point> & node_map)
+std::vector<Point>
+read_coordinates(exodusIIcpp::File & exo, int dim)
 {
     // build nodes
     auto n_nodes = exo.get_num_nodes();
+    std::vector<Point> nodes;
+    nodes.reserve(n_nodes);
     exo.read_coords();
     if (dim == 2) {
         auto x = exo.get_x_coords();
         auto y = exo.get_y_coords();
         for (int i = 0; i < n_nodes; ++i) {
             Point pt(x[i], y[i], 0.);
-            node_map.emplace_back(pt);
+            nodes.emplace_back(pt);
         }
     }
     else if (dim == 3) {
@@ -106,11 +105,12 @@ read_coordinates(exodusIIcpp::File & exo, int dim, std::vector<Point> & node_map
         auto z = exo.get_z_coords();
         for (int i = 0; i < n_nodes; ++i) {
             Point pt(x[i], y[i], z[i]);
-            node_map.emplace_back(pt);
+            nodes.emplace_back(pt);
         }
     }
     else
         throw std::runtime_error(fmt::format("Unsupported dimension {}", dim));
+    return nodes;
 }
 
 std::map<int, std::vector<int>>
@@ -166,31 +166,37 @@ read_global_vals(const exodusIIcpp::File & exo)
 }
 
 void
-write_nodes(exodusIIcpp::File & exo, int dim, const std::vector<Point> & node_map)
+write_nodes(exodusIIcpp::File & exo, int dim, const std::vector<std::vector<Point>> & node_map)
 {
-    auto n_nodes = node_map.size();
+    auto n_nodes = 0;
+    for (auto & pts : node_map)
+        n_nodes += pts.size();
+
+    std::vector<double> x;
+    std::vector<double> y;
+    std::vector<double> z;
+
     if (dim == 2) {
-        std::vector<double> x;
         x.reserve(n_nodes);
-        std::vector<double> y;
         y.reserve(n_nodes);
-        for (auto & pt : node_map) {
-            x.emplace_back(pt.x);
-            y.emplace_back(pt.y);
+        for (auto & f_pts : node_map) {
+            for (auto & pt : f_pts) {
+                x.emplace_back(pt.x);
+                y.emplace_back(pt.y);
+            }
         }
         exo.write_coords(x, y);
     }
     else if (dim == 3) {
-        std::vector<double> x;
         x.reserve(n_nodes);
-        std::vector<double> y;
         y.reserve(n_nodes);
-        std::vector<double> z;
         z.reserve(n_nodes);
-        for (auto & pt : node_map) {
-            x.emplace_back(pt.x);
-            y.emplace_back(pt.y);
-            z.emplace_back(pt.z);
+        for (auto & f_pts : node_map) {
+            for (auto & pt : f_pts) {
+                x.emplace_back(pt.x);
+                y.emplace_back(pt.y);
+                z.emplace_back(pt.z);
+            }
         }
         exo.write_coords(x, y, z);
     }
@@ -229,8 +235,8 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
 {
     // Spatial dimension
     int dim = -1;
-    // Mapping node coordinates into global index: Point -> Global ID (0-based)
-    std::vector<Point> node_map;
+    // Node coordinates: file -> `Point`s
+    std::vector<std::vector<Point>> node_map(inputs.size());
     // Block IDs
     std::set<int64_t> block_ids;
     /// Block ID -> element type
@@ -250,10 +256,9 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     // Global variable values
     std::vector<std::vector<double>> global_vals;
 
+    int connect_ofst = 0;
     // read data
-    for (int i = 0; i < inputs.size(); ++i) {
-        int connect_ofst = node_map.size();
-
+    for (std::size_t i = 0; i < inputs.size(); ++i) {
         exodusIIcpp::File ex_in(inputs[i], exodusIIcpp::FileAccess::READ);
         ex_in.init();
 
@@ -262,12 +267,13 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
         ex_in.read_blocks();
         read_block_ids(ex_in, block_ids);
         read_element_types(ex_in, block_element_type);
-        read_coordinates(ex_in, dim, node_map);
+        node_map[i] = read_coordinates(ex_in, dim);
         auto blocks = read_elements(ex_in);
         for (auto & [id, connect] : blocks) {
             shift(connect, connect_ofst);
             block_connect[id].insert(block_connect[id].end(), connect.begin(), connect.end());
         }
+        connect_ofst += node_map[i].size();
 
         // block names
         for (auto [id, name] : ex_in.read_block_names())
@@ -310,14 +316,14 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     ex_out.write_nodal_var_names(nodal_var_names);
     if (not global_var_names.empty())
         ex_out.write_global_var_names(global_var_names);
-    for (auto t = 0; t < times.size(); ++t) {
+    for (std::size_t t = 0; t < times.size(); ++t) {
         ex_out.write_time(t + 1, times[t]);
 
         {
             std::vector<double> values(n_nodes);
-            for (int var_idx = 0; var_idx < nodal_var_names.size(); ++var_idx) {
-                int iidx = 0;
-                for (auto fi = 0; fi < nodal_vals.size(); ++fi) {
+            for (std::size_t var_idx = 0; var_idx < nodal_var_names.size(); ++var_idx) {
+                std::size_t iidx = 0;
+                for (std::size_t fi = 0; fi < nodal_vals.size(); ++fi) {
                     const auto & vals = nodal_vals[fi][t][var_idx];
                     for (std::size_t i = 0; i < vals.size(); ++i) {
                         values[iidx++] = vals[i];
@@ -327,7 +333,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
             }
         }
         {
-            for (int var_idx = 0; var_idx < global_var_names.size(); ++var_idx)
+            for (std::size_t var_idx = 0; var_idx < global_var_names.size(); ++var_idx)
                 ex_out.write_global_var(t + 1, var_idx + 1, global_vals[t][var_idx]);
         }
 
