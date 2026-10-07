@@ -23,7 +23,9 @@ enum class ElementType {
 inline ElementType
 element_type(std::string_view str)
 {
-    if (str == "BAR2")
+    if (str == "SPHERE")
+        return ElementType::POINT1;
+    else if (str == "BAR2")
         return ElementType::SEGMENT2;
     else if (str == "TRI" || str == "TRI3")
         return ElementType::TRI3;
@@ -43,7 +45,7 @@ inline const char *
 element_type_str(ElementType et)
 {
     if (et == ElementType::POINT1)
-        return "POINT";
+        return "SPHERE";
     else if (et == ElementType::SEGMENT2)
         return "BAR2";
     else if (et == ElementType::TRI3)
