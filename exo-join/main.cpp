@@ -87,7 +87,7 @@ read_block_ids(exodusIIcpp::File & exo, std::set<int64_t> & block_ids)
 }
 
 void
-read_file(exodusIIcpp::File & exo, int dim, std::vector<Point> & node_map)
+read_coordinates(exodusIIcpp::File & exo, int dim, std::vector<Point> & node_map)
 {
     // build nodes
     auto n_nodes = exo.get_num_nodes();
@@ -262,7 +262,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
         ex_in.read_blocks();
         read_block_ids(ex_in, block_ids);
         read_element_types(ex_in, block_element_type);
-        read_file(ex_in, dim, node_map);
+        read_coordinates(ex_in, dim, node_map);
         auto blocks = read_elements(ex_in);
         for (auto & [id, connect] : blocks) {
             shift(connect, connect_ofst);
