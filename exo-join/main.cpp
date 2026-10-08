@@ -34,6 +34,9 @@ using NodeMap = std::map<int, int>;
 /// Variable values. Time steps, variables, values
 using NodalVariableValues = std::vector<std::vector<std::vector<double>>>;
 
+/// Elemental variable values. Time steps, {(variable ID, block ID) -> values}
+using ElementalVariableValues = std::vector<std::map<std::pair<int, int>, std::vector<double>>>;
+
 /// Block ID -> num elements per node
 std::map<int, int> num_nodes_per_elem;
 
@@ -152,6 +155,36 @@ read_nodal_vals(exodusIIcpp::File & exo)
     return nodal_var_values;
 }
 
+ElementalVariableValues
+read_elemental_vals(exodusIIcpp::File & exo)
+{
+    auto n_elem_vars = exo.get_elemental_variable_names().size();
+
+    auto n_times = exo.get_num_times();
+    ElementalVariableValues elem_var_values(n_times);
+
+    auto tt = exo.get_elemental_var_table();
+
+    auto & el_blks = exo.get_element_blocks();
+
+    std::vector<int> elem_var_indices(n_elem_vars);
+    std::iota(elem_var_indices.begin(), elem_var_indices.end(), 0);
+
+    for (int t = 0; t < n_times; ++t) {
+        for (auto & var_idx : elem_var_indices) {
+            for (std::size_t blk_idx = 0; blk_idx < el_blks.size(); blk_idx++) {
+                if (tt(blk_idx + 1, var_idx + 1)) {
+                    auto blk_id = el_blks[blk_idx].get_id();
+                    auto vals = exo.get_elemental_variable_values(t + 1, var_idx + 1, blk_id);
+                    elem_var_values[t][{ var_idx, blk_id }] = vals;
+                }
+            }
+        }
+    }
+
+    return elem_var_values;
+}
+
 std::vector<std::vector<double>>
 read_global_vals(const exodusIIcpp::File & exo)
 {
@@ -230,6 +263,40 @@ write_block_names(exodusIIcpp::File & exo,
         exo.write_block_names(names);
 }
 
+/// Build elemental variable by joining values from all files
+std::vector<double>
+join_elemental_variable(std::size_t t,
+                        std::size_t var_idx,
+                        std::size_t block_id,
+                        const std::vector<ElementalVariableValues> & elem_vals)
+{
+    std::size_t n_elems = 0;
+    for (std::size_t fi = 0; fi < elem_vals.size(); ++fi) {
+        n_elems += elem_vals[fi][t].at({ var_idx, block_id }).size();
+    }
+
+    std::vector<double> values;
+    values.reserve(n_elems);
+    for (std::size_t fi = 0; fi < elem_vals.size(); ++fi) {
+        const auto & vals = elem_vals[fi][t].at({ var_idx, block_id });
+        values.insert(values.end(), vals.begin(), vals.end());
+    }
+
+    return values;
+}
+
+void
+write_elemental_variable(exodusIIcpp::File & exo,
+                         int step_num,
+                         int var_index,
+                         int64_t block_id,
+                         const std::vector<double> & values)
+{
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        exo.write_partial_elem_var(step_num + 1, var_index + 1, block_id, i + 1, values[i]);
+    }
+}
+
 void
 join_files(const std::vector<std::string> & inputs, const std::string & output)
 {
@@ -249,6 +316,10 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     std::vector<std::string> nodal_var_names;
     // Nodal variable values per input file
     std::vector<NodalVariableValues> nodal_vals(inputs.size());
+    // Elemental var names
+    std::vector<std::string> elem_var_names;
+    // Elemental variable values per input file
+    std::vector<ElementalVariableValues> elem_vals(inputs.size());
     // Time steps
     std::vector<double> times;
     // Global variable names
@@ -282,11 +353,16 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
         // TODO: even check var names...
         nodal_var_names = ex_in.get_nodal_variable_names();
 
+        // TODO: check variable name. now, we assume that all files have the same
+        // elemental variable names
+        elem_var_names = ex_in.get_elemental_variable_names();
+
         ex_in.read_times();
         // TODO: check that files have the same number of time steps
         times = ex_in.get_times();
 
         nodal_vals[i] = read_nodal_vals(ex_in);
+        elem_vals[i] = read_elemental_vals(ex_in);
 
         // TODO: check var names, possibly even merge
         if (i == 0) {
@@ -316,6 +392,7 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
     write_block_names(ex_out, block_ids, block_names);
 
     ex_out.write_nodal_var_names(nodal_var_names);
+    ex_out.write_elem_var_names(elem_var_names);
     if (not global_var_names.empty())
         ex_out.write_global_var_names(global_var_names);
     for (std::size_t t = 0; t < times.size(); ++t) {
@@ -334,6 +411,14 @@ join_files(const std::vector<std::string> & inputs, const std::string & output)
                 ex_out.write_nodal_var(t + 1, var_idx + 1, values);
             }
         }
+        // elemental variables
+        // NOTE: we grap 0th file, since we assume the same map in each file
+        for (auto & [k, _] : elem_vals[0][t]) {
+            auto [var_idx, block_id] = k;
+            auto values = join_elemental_variable(t, var_idx, block_id, elem_vals);
+            write_elemental_variable(ex_out, t, var_idx, block_id, values);
+        }
+
         {
             for (std::size_t var_idx = 0; var_idx < global_var_names.size(); ++var_idx)
                 ex_out.write_global_var(t + 1, var_idx + 1, global_vals[t][var_idx]);

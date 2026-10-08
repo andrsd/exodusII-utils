@@ -7,7 +7,7 @@ project(exodusII-utils
 
 include(CMakePackageConfigHelpers)
 
-find_package(exodusIIcpp 3 REQUIRED)
+find_package(exodusIIcpp 3.2 REQUIRED)
 find_package(fmt 11 REQUIRED)
 
 add_subdirectory(exo-join)
