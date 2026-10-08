@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 project(exodusII-utils
-    LANGUAGES CXX
+    LANGUAGES CXX C
     VERSION 0.3.1
 )
 
