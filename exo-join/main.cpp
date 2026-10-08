@@ -138,10 +138,13 @@ read_elements(exodusIIcpp::File & exo)
 NodalVariableValues
 read_nodal_vals(exodusIIcpp::File & exo)
 {
-    auto n_nodal_vars = exo.get_nodal_variable_names().size();
-
     auto n_times = exo.get_num_times();
     NodalVariableValues nodal_var_values(n_times);
+
+    auto n_nodal_vars = exo.get_nodal_variable_names().size();
+    if (n_nodal_vars == 0)
+        return nodal_var_values;
+
     for (auto & var_vals : nodal_var_values)
         var_vals.resize(n_nodal_vars);
 
@@ -158,10 +161,12 @@ read_nodal_vals(exodusIIcpp::File & exo)
 ElementalVariableValues
 read_elemental_vals(exodusIIcpp::File & exo)
 {
-    auto n_elem_vars = exo.get_elemental_variable_names().size();
-
     auto n_times = exo.get_num_times();
     ElementalVariableValues elem_var_values(n_times);
+
+    auto n_elem_vars = exo.get_elemental_variable_names().size();
+    if (n_elem_vars == 0)
+        return elem_var_values;
 
     auto tt = exo.get_elemental_var_table();
 
